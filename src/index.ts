@@ -1,8 +1,12 @@
-export class C {
-    private x = 10
-    getX = () => this.x;
-    setX = (newVal: number) => { this.x = newVal; }
-}
+import { Raytracer } from './raytracer/Raytracer';
 
-export let x = new C();
-export let y = { ...{ some: "value" } }
+document.addEventListener('DOMContentLoaded', () => {
+  const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+  if (!canvas) {
+    console.log('No canvas found');
+    return;
+  }
+
+  const gl = new Raytracer(canvas);
+  console.log(gl);
+});
