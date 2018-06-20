@@ -112,15 +112,15 @@ export class Raytracer {
     const { gl, program } = this;
     if (!program) return;
 
+    gl.useProgram(program);
+
     // Bind the position buffer.
     const buffers = this.initBuffers();
 
     this.resizeCanvas();
 
-    gl.clearColor(0, 0, 0, 0);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-
-    gl.useProgram(program);
 
     gl.enableVertexAttribArray(this.positionAttributeLocation);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
