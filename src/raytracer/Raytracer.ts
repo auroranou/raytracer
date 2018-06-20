@@ -1,15 +1,15 @@
-import { attribs, uniforms, vsSource, varMap } from './VertexShader';
-import { fsSource } from './FragmentShader';
+import fsSource from '!raw-loader!../shaders/fragment.glsl';
+import vsSource from '!raw-loader!../shaders/vertex.glsl';
 
 export class Raytracer {
-  private attribs: AttribsMap;
   public canvas: HTMLCanvasElement;
   private gl: WebGLRenderingContext;
+  private positionAttributeLocation: number;
   private program: WebGLProgram | null;
-  private uniforms: UniformsMap;
+  private resolutionUniformLocation: WebGLUniformLocation;
 
   constructor(canvas: HTMLCanvasElement) {
-    const gl = canvas.getContext("webgl");
+    const gl = canvas.getContext('webgl');
     if (!gl) {
       throw new Error('WebGL is not available');
     }
@@ -17,35 +17,18 @@ export class Raytracer {
     this.canvas = canvas;
     this.gl = gl;
 
-    // Set clear color to black, fully opaque
-    this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
-    // Clear the color buffer with specified clear color
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-
-    this.program = this.createProgram(vsSource, fsSource);
+    this.program = this.createProgram();
     if (!this.program) {
       throw new Error('WebGL program was not created');
     }
 
-    this.attribs = Object.keys(attribs).reduce((memo: AttribsMap, curr: string) => {
-      const val = attribs[curr];
-      memo[val] = this.gl.getAttribLocation(this.program, val);
-      return memo;
-    }, {});
+    this.positionAttributeLocation = this.gl.getAttribLocation(this.program, 'aPosition');
+    this.resolutionUniformLocation = this.gl.getUniformLocation(this.program, 'uResolution') as WebGLUniformLocation;
 
-    this.uniforms = Object.keys(uniforms).reduce((memo: UniformsMap, curr: string) => {
-      const val = uniforms[curr];
-      const loc = this.gl.getUniformLocation(this.program, val);
-      if (loc) memo[val] = loc;
-      return memo;
-    }, {});
-
-    const buffers = this.createBuffers();
-    this.resizeCanvas();
-    this.render(buffers);
+    this.render();
   }
 
-  private createProgram(vsSource: string, fsSource: string): WebGLProgram | null {
+  private createProgram(): WebGLProgram | null {
     const { gl } = this;
     // https://developer.mozilla.org/en-US/docs/Web/API/WebGLProgram
     const vShader = this.createShader(gl.VERTEX_SHADER, vsSource);
@@ -58,7 +41,6 @@ export class Raytracer {
     gl.linkProgram(shaderProgram);
 
     if (gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-      console.log(shaderProgram);
       return shaderProgram;
     }
 
@@ -68,6 +50,7 @@ export class Raytracer {
 
   private createShader(type: number, source: string): WebGLShader | null {
     const { gl } = this;
+
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
@@ -80,8 +63,9 @@ export class Raytracer {
     return null;
   }
 
-  private createBuffers(): BufferObject {
+  private initBuffers(): BufferObject {
     const { gl } = this;
+
     // Allocate a new buffer and bind it to the GL context
     const positionBuffer = gl.createBuffer() as WebGLBuffer;
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -104,13 +88,13 @@ export class Raytracer {
 
   private resizeCanvas(): void {
     const { gl } = this;
-    const realToCSSPixels = window.devicePixelRatio;
+    const realToCssPixels = window.devicePixelRatio;
 
     // Lookup the size the browser is displaying the canvas in CSS pixels
     // and compute a size needed to make our drawingbuffer match it in
     // device pixels.
-    const displayWidth = Math.floor(gl.canvas.clientWidth * realToCSSPixels);
-    const displayHeight = Math.floor(gl.canvas.clientHeight * realToCSSPixels);
+    const displayWidth = Math.floor(gl.canvas.clientWidth * realToCssPixels);
+    const displayHeight = Math.floor(gl.canvas.clientHeight * realToCssPixels);
 
     // Check if the canvas is not the same size.
     if (gl.canvas.width !== displayWidth ||
@@ -124,31 +108,29 @@ export class Raytracer {
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   }
 
-  private render(buffers: BufferObject) {
-    // Clear the canvas
-    this.gl.clearColor(0, 0, 0, 0);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-
-    if (!this.program) return;
-    this.gl.useProgram(this.program);
+  private render() {
+    const { gl, program } = this;
+    if (!program) return;
 
     // Bind the position buffer.
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffers.position);
+    const buffers = this.initBuffers();
 
-    const positionAttribLoc = this.attribs[attribs.pos];
+    this.resizeCanvas();
+
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(program);
+
+    gl.enableVertexAttribArray(this.positionAttributeLocation);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+
     // Tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
-    var size = 2;             // 2 components per iteration
-    var type = this.gl.FLOAT; // the data is 32bit floats
-    var normalize = false;    // don't normalize the data
-    var stride = 0;           // 0 = move forward size * sizeof(type) each iteration to get the next position
-    var offset = 0;           // start at the beginning of the buffer
-    this.gl.vertexAttribPointer(positionAttribLoc, size, type, normalize, stride, offset);
-    this.gl.enableVertexAttribArray(positionAttribLoc);
+    gl.vertexAttribPointer(this.positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
 
-    var primitiveType = this.gl.TRIANGLES;
-    var offset = 0;
-    var count = 3;
-    this.gl.drawArrays(primitiveType, offset, count);
+    gl.uniform2f(this.resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
+
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     console.log('rendered!');
   }
@@ -156,12 +138,4 @@ export class Raytracer {
 
 export type BufferObject = {
   [key: string]: WebGLBuffer;
-};
-
-export type AttribsMap = {
-  [key: string]: number;
-};
-
-export type UniformsMap = {
-  [key: string]: WebGLUniformLocation;
 };
