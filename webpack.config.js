@@ -8,6 +8,7 @@ module.exports = {
     path: path.resolve(__dirname, 'dist'),
     filename: 'app.bundle.js'
   },
+  mode: process.env === 'DEVELOPMENT' ? 'development' : 'production',
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.json'],
     modules: [path.resolve(__dirname, 'node_modules')]
