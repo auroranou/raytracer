@@ -1,5 +1,9 @@
 precision mediump float;
 
+uniform vec3 uLightAmb;
+uniform vec3 uLightDiff;
+uniform vec3 uSphereAmb;
+uniform vec3 uSphereDiff;
 uniform vec2 uResolution;
 
 struct Light {
@@ -84,8 +88,8 @@ void main() {
   vec4 color = vec4(vec3(0.0), 1.0);
 
   Light light;
-  light.ambient = vec3(0.05);
-  light.diffuse = vec3(0.5, 0.8, 0.1);
+  light.ambient = uLightAmb;
+  light.diffuse = uLightDiff;
   light.position = vec3(1.0);
   light.specular = vec3(1.0);
 
@@ -95,8 +99,8 @@ void main() {
   
   Sphere sphere;
   sphere.center = vec3(0.0);
-  sphere.materialAmbient = vec3(0.8, 0.8, 1.0);
-  sphere.materialDiffuse = vec3(1.0);
+  sphere.materialAmbient = uSphereAmb;
+  sphere.materialDiffuse = uSphereDiff;
   // Shiny spot will be white
   sphere.materialSpecular = vec3(1.0);
   sphere.radius = 0.5;

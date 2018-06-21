@@ -1,12 +1,55 @@
 import fsSource from '!raw-loader!../shaders/fragment.glsl';
 import vsSource from '!raw-loader!../shaders/vertex.glsl';
+import { Vector } from './Vector';
+
+export type IdMap<T> = {
+  [key: string]: T
+};
+
+export type InputControl = {
+  defaultValue: number;
+  // dimension: 'x' | 'y' | 'z';
+  // id: string;
+  uniformName: string;
+};
+
+const uLightAmb = new Vector(12.75, 12.75, 12.75);
+const uLightDiff = new Vector(127.5, 204, 25.1);
+const uSphereAmb = new Vector(204, 204, 255);
+const uSphereDiff = new Vector(255, 255, 255);
+
+const uniforms = {
+  uLightAmb,
+  uLightDiff,
+  uSphereAmb,
+  uSphereDiff
+} as IdMap<Vector>;
+
+export const controls: IdMap<InputControl> = {
+  'light-ambience-red': {
+    defaultValue: 12.75,
+    uniformName: 'uLightAmb'
+  },
+  'light-ambience-green': {
+    defaultValue: 12.75,
+    uniformName: 'uLightAmb'
+  },
+  'light-ambience-blue': {
+    defaultValue: 12.75,
+    uniformName: 'uLightAmb'
+  },
+};
 
 export class Raytracer {
   public canvas: HTMLCanvasElement;
   private gl: WebGLRenderingContext;
+  private lightAmbUniformLocation: WebGLUniformLocation;
+  private lightDiffUniformLocation: WebGLUniformLocation;
   private positionAttributeLocation: number;
   private program: WebGLProgram | null;
   private resolutionUniformLocation: WebGLUniformLocation;
+  private sphereAmbUniformLocation: WebGLUniformLocation;
+  private sphereDiffUniformLocation: WebGLUniformLocation;
 
   constructor(canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl');
@@ -25,7 +68,14 @@ export class Raytracer {
     this.positionAttributeLocation = this.gl.getAttribLocation(this.program, 'aPosition');
     this.resolutionUniformLocation = this.gl.getUniformLocation(this.program, 'uResolution') as WebGLUniformLocation;
 
+    // Slider-controlled uniforms for lighting
+    this.lightAmbUniformLocation = this.gl.getUniformLocation(this.program, 'uLightAmb') as WebGLUniformLocation;
+    this.lightDiffUniformLocation = this.gl.getUniformLocation(this.program, 'uLightDiff') as WebGLUniformLocation;
+    this.sphereAmbUniformLocation = this.gl.getUniformLocation(this.program, 'uSphereAmb') as WebGLUniformLocation;
+    this.sphereDiffUniformLocation = this.gl.getUniformLocation(this.program, 'uSphereDiff') as WebGLUniformLocation;
+
     this.render();
+    this.buildControls();
   }
 
   private createProgram(): WebGLProgram | null {
@@ -130,12 +180,92 @@ export class Raytracer {
 
     gl.uniform2f(this.resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
 
+    // Set values that can be controlled using range inputs
+    gl.uniform3f(this.lightAmbUniformLocation, uLightAmb.x / 255, uLightAmb.y / 255, uLightAmb.z / 255);
+    gl.uniform3f(this.lightDiffUniformLocation, uLightDiff.x / 255, uLightDiff.y / 255, uLightDiff.z / 255);
+    gl.uniform3f(this.sphereAmbUniformLocation, uSphereAmb.x / 255, uSphereAmb.y / 255, uSphereAmb.z / 255);
+    gl.uniform3f(this.sphereDiffUniformLocation, uSphereDiff.x / 255, uSphereDiff.y / 255, uSphereDiff.z / 255);
+
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     console.log('rendered!');
+  }
+
+  private buildControls(): void {
+    const objs = {
+      light: [uSphereAmb, uLightDiff],
+      sphere: [uSphereAmb, uSphereDiff]
+    } as { [key: string]: Vector[] };
+
+    const controlsContainer = document.getElementById('controls');
+    if (!controlsContainer) return;
+
+    Object.keys(objs).forEach(objType => {
+      const header = document.createElement('h2');
+      header.innerText = capitalize(objType);
+      controlsContainer.appendChild(header);
+
+      const fieldset = objs[objType];
+
+      fieldset.forEach((vector: Vector, idx: number) => {
+        const fieldsetEl = document.createElement('fieldset');
+        const legend = document.createElement('legend');
+        legend.innerText = idx === 0 ? 'Ambient' : 'Diffuse';
+        fieldsetEl.appendChild(legend);
+
+        const { x, y, z } = vector;
+        fieldsetEl.appendChild(this.createRangeInput(`${objType}-${idx}-x`, x, 'Red'));
+        fieldsetEl.appendChild(this.createRangeInput(`${objType}-${idx}-y`, y, 'Green'));
+        fieldsetEl.appendChild(this.createRangeInput(`${objType}-${idx}-z`, z, 'Blue'));
+
+        controlsContainer.appendChild(fieldsetEl);
+      });
+    });
+  }
+
+  private createRangeInput(id: string, initialValue: number, labelText: string): HTMLElement {
+    let label = document.createElement('label') as HTMLLabelElement;
+    label.htmlFor = id;
+    let labelSpan = document.createElement('span');
+    labelSpan.innerText = labelText;
+    label.appendChild(labelSpan);
+
+    let input = document.createElement('input');
+    input.id = id;
+    input.max = '255';
+    input.min = '0';
+    input.name = id;
+    input.type = 'range';
+    input.value = initialValue.toString();
+
+    input.addEventListener('change', this.onSliderChange.bind(this));
+
+    label.appendChild(input);
+    return label;
+  }
+
+  // On input change, get new value, figure out which uniform to update, update relevant vector dimension
+  private onSliderChange(e: Event) {
+    const { id, value } = e.target as HTMLInputElement;
+
+    const chunks = id.split('-');
+    const uniformName = `u${capitalize(chunks[0])}${chunks[1] === '0' ? 'Amb' : 'Diff'}`;
+    const targetVector = uniforms[uniformName];
+    const newVector: Vector = {
+      ...targetVector,
+      [chunks[2]]: +value
+    };
+
+    const uniformLocation = this.gl.getUniformLocation(this.program, uniformName);
+    this.gl.uniform3f(uniformLocation, newVector.x / 255, newVector.y / 255, newVector.z / 255);
+    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
   }
 }
 
 export type BufferObject = {
   [key: string]: WebGLBuffer;
 };
+
+function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.substring(1, str.length);
+}

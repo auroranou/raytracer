@@ -5,8 +5,46 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Page Title</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: sans-serif;
+      font-size: 16px;
+    }
+
+    #controls {
+      display: inline-block;
+      vertical-align: top;
+    }
+
+    fieldset {
+      border: 0;
+    }
+
+    legend {
+      font-weight: bold;
+    }
+
+    label {
+      display: block;
+    }
+
+    fieldset label > span {
+      display: inline-block;
+      width: 80px;
+    }
+
+    fieldset label input {
+      display: inline-block;
+      margin-bottom: 0.5rem;
+    }
+  </style>
 </head>
 <body>
   <canvas id='canvas' width='500' height='500'></canvas>
+  <div id='controls'></div>
 </body>
 </html>
