@@ -30,7 +30,7 @@ export class Raytracer {
     this.resolutionUniformLocation = this.gl.getUniformLocation(this.program, 'uResolution') as WebGLUniformLocation;
 
     // Slider-controlled uniforms for lighting
-    const controls = new Controls(this.gl);
+    const controls = new Controls(this.gl, this.program);
     this.uniforms = controls.uniformControls;
     controls.render();
 

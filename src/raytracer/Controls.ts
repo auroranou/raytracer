@@ -34,16 +34,18 @@ export const uniforms = {
 
 export class Controls {
   private gl: WebGLRenderingContext;
+  private program: WebGLProgram;
   public uniformControls: IdMap<UniformControl>
 
   constructor(gl: WebGLRenderingContext, program: WebGLProgram) {
     this.gl = gl;
+    this.program = program;
 
     this.uniformControls = Object.keys(uniforms).reduce((memo, curr) => {
       const uniform = uniforms[curr];
       memo[uniform.uniformName] = {
         ...uniform,
-        location: this.gl.getUniformLocation(program, uniform.uniformName) as WebGLUniformLocation,
+        location: this.gl.getUniformLocation(this.program, uniform.uniformName) as WebGLUniformLocation,
         value: uniform.defaultValue
       };
       return memo;
