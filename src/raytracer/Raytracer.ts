@@ -1,41 +1,8 @@
 import fsSource from '!raw-loader!../shaders/fragment.glsl';
 import vsSource from '!raw-loader!../shaders/vertex.glsl';
 import { Vector } from './Vector';
-
-export interface IdMap<T> {
-  [key: string]: T
-};
-
-export type UniformControl = {
-  defaultValue: Vector;
-  label: string;
-  location?: WebGLUniformLocation;
-  uniformName: string;
-  value?: Vector;
-};
-
-const uniforms = {
-  uLightAmb: {
-    defaultValue: new Vector(12.75, 12.75, 12.75),
-    label: 'Light: Ambient',
-    uniformName: 'uLightAmb'
-  },
-  uLightDiff: {
-    defaultValue: new Vector(127.5, 204, 25.1),
-    label: 'Light: Diffuse',
-    uniformName: 'uLightDiff'
-  },
-  uSphereAmb: {
-    defaultValue: new Vector(204, 204, 255),
-    label: 'Sphere: Ambient',
-    uniformName: 'uSphereAmb'
-  },
-  uSphereDiff: {
-    defaultValue: new Vector(255, 255, 255),
-    label: 'Sphere: Diffuse',
-    uniformName: 'uSphereDiff'
-  }
-} as IdMap<UniformControl>;
+import { IdMap } from './helpers';
+import { UniformControl, Controls } from './Controls';
 
 export class Raytracer {
   public canvas: HTMLCanvasElement;
@@ -63,17 +30,10 @@ export class Raytracer {
     this.resolutionUniformLocation = this.gl.getUniformLocation(this.program, 'uResolution') as WebGLUniformLocation;
 
     // Slider-controlled uniforms for lighting
-    this.uniforms = Object.keys(uniforms).reduce((memo, curr) => {
-      const uniform = uniforms[curr];
-      memo[uniform.uniformName] = {
-        ...uniform,
-        location: this.gl.getUniformLocation(this.program, uniform.uniformName) as WebGLUniformLocation,
-        value: uniform.defaultValue
-      }
-      return memo;
-    }, {} as IdMap<UniformControl>);
+    const controls = new Controls(this.gl);
+    this.uniforms = controls.uniformControls;
+    controls.render();
 
-    this.buildControls();
     this.render();
   }
 
@@ -140,15 +100,12 @@ export class Raytracer {
     const realToCssPixels = window.devicePixelRatio;
 
     // Lookup the size the browser is displaying the canvas in CSS pixels
-    // and compute a size needed to make our drawingbuffer match it in
-    // device pixels.
+    // and compute a size needed to make our drawingbuffer match it in device pixels.
     const displayWidth = Math.floor(gl.canvas.clientWidth * realToCssPixels);
     const displayHeight = Math.floor(gl.canvas.clientHeight * realToCssPixels);
 
     // Check if the canvas is not the same size.
-    if (gl.canvas.width !== displayWidth ||
-      gl.canvas.height !== displayHeight) {
-
+    if (gl.canvas.width !== displayWidth || gl.canvas.height !== displayHeight) {
       // Make the canvas the same size
       gl.canvas.width = displayWidth;
       gl.canvas.height = displayHeight;
@@ -189,74 +146,5 @@ export class Raytracer {
     });
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  }
-
-  private buildControls(): void {
-    const controlsContainer = document.getElementById('controls');
-    if (!controlsContainer) return;
-
-    Object.keys(this.uniforms).forEach((key: string) => {
-      const uniform = uniforms[key];
-
-      const fieldset = document.createElement('fieldset');
-      const legend = document.createElement('legend');
-      legend.innerText = uniform.label;
-      fieldset.appendChild(legend);
-
-      const { x, y, z } = uniform.value || uniform.defaultValue;
-      fieldset.appendChild(this.createRangeInput(`${uniform.uniformName}-x`, x, 'Red'));
-      fieldset.appendChild(this.createRangeInput(`${uniform.uniformName}-y`, y, 'Green'));
-      fieldset.appendChild(this.createRangeInput(`${uniform.uniformName}-z`, z, 'Blue'));
-
-      controlsContainer.appendChild(fieldset);
-    });
-  }
-
-  private createRangeInput(id: string, initialValue: number, labelText: string): HTMLElement {
-    let label = document.createElement('label') as HTMLLabelElement;
-    label.htmlFor = id;
-    let labelSpan = document.createElement('span');
-    labelSpan.innerText = labelText;
-    label.appendChild(labelSpan);
-
-    let input = document.createElement('input');
-    input.id = id;
-    input.max = '255';
-    input.min = '0';
-    input.name = id;
-    input.type = 'range';
-    input.value = initialValue.toString();
-
-    input.addEventListener('change', this.onSliderChange.bind(this));
-
-    label.appendChild(input);
-    return label;
-  }
-
-  // On input change, get new value, figure out which uniform to update, update relevant vector dimension
-  private onSliderChange(e: Event) {
-    const { id, value } = e.target as HTMLInputElement;
-    const [name, channel, ...rest] = id.split('-');
-    const uniform = this.uniforms[name];
-    if (!uniform || !uniform.location) return;
-
-    let updatedValue = uniform.value || uniform.defaultValue;
-    updatedValue = {
-      ...updatedValue,
-      [channel]: value
-    } as Vector;
-
-    const updatedUniform = {
-      ...uniform,
-      value: updatedValue
-    } as UniformControl;
-
-    this.uniforms = {
-      ...this.uniforms,
-      [uniform.uniformName]: updatedUniform
-    };
-
-    this.gl.uniform3f(uniform.location, +updatedValue.x / 255, +updatedValue.y / 255, +updatedValue.z / 255);
-    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
   }
 }

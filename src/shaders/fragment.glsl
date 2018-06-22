@@ -90,7 +90,7 @@ void main() {
   Light light;
   light.ambient = uLightAmb;
   light.diffuse = uLightDiff;
-  light.position = vec3(1.0);
+  light.position = vec3(1.0, 2.0, 2.0);
   light.specular = vec3(1.0);
 
   Ray ray;
