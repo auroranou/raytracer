@@ -50,8 +50,6 @@ export class Controls {
       };
       return memo;
     }, {} as IdMap<UniformControl>);
-
-    this.render();
   }
 
   public render(): void {
